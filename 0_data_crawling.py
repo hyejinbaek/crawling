@@ -79,7 +79,7 @@ def load_reviews_with_limit(limit=5):
             # "더보기" 버튼이 없으면 루프를 빠져나옴
             break
 
-def save_to_excel(data, filename='key1.xlsx'):
+def save_to_excel(data, filename='crawling_result.xlsx'):
     # 열 이름 정의 (data의 요소 개수와 일치해야 함)
     columns = ['Category', 'Keyword', 'Title', 'Address', 'number', 'service', 'wk', 'info1', 'info2', 'reviews_text']
     
