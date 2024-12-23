@@ -16,7 +16,7 @@ warnings.filterwarnings('ignore')
 start = time.time() 
 
 # 키워드 파일 읽어옴
-df_f = pd.read_excel("./keyword.xlsx")
+df_f = pd.read_excel("./keywords.xlsx")
 
 chrome_options = Options()
 chrome_options.add_argument('--headless')  # 헤드리스 모드
@@ -34,10 +34,11 @@ driver.maximize_window() #전체 화면 시행
 def switch_frame(frame_name):
     driver.switch_to.default_content()
     try:
-        # 프레임이 로딩될 때까지 최대 10초 대기
-        WebDriverWait(driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, frame_name)))
+        # 프레임이 로딩될 때까지 최대 15초 대기
+        WebDriverWait(driver, 20).until(EC.frame_to_be_available_and_switch_to_it((By.ID, frame_name)))
     except TimeoutException:
-        print(f"프레임 {frame_name}이(가) 로드되지 않았습니다.")
+        print(f"[경고] 프레임 {frame_name}이(가) 로드되지 않았습니다. 다시 시도합니다.")
+        # 재시도 로직을 추가할 수 있습니다 (예: page refresh)
 
 # 스크롤 시행 
 def page_down(num):
@@ -86,7 +87,7 @@ def load_reviews_with_limit(limit=5):
             # "더보기" 버튼이 없으면 루프를 빠져나옴
             break
 
-def save_to_excel(data, filename='crawling_result.xlsx'):
+def save_to_excel(data, filename='crawling_주유소세차장.xlsx'):
     # 열 이름 정의 (data의 요소 개수와 일치해야 함)
     columns = ['Category', 'Keyword', 'Title', 'Address', 'number', 'service', 'wk', 'info1', 'info2', 'reviews_text']
     
@@ -115,7 +116,7 @@ total_t = []
 
 # 검색키워드
 for idx, v in enumerate(df_f['검색리스트'], start=1):
-    keyword = f'{v}'
+    keyword = f"{v} 주유소 세차장"
     if keyword == '':
         continue  
     else:
@@ -125,7 +126,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
 
 
     # 메인 프레임
-    switch_frame('searchIframe') 
+    switch_frame('searchIframe')
 
     # 소스, 파싱
     res = driver.page_source  
@@ -152,15 +153,22 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
             if t_len == 0:
                 break
             #==================================================================================================================        
-            # 업체 한곳 
+            # 업체 한곳
             if t_len == 1:
+                
+                # 단일 업체에서는 항상 첫번째 요소를 선택
+                element = page[0]
+                
+                # 업체 클릭
+                element.click()
+                time.sleep(0.3)
+                
                 switch_frame('entryIframe')
-                time.sleep(0.5)
+                time.sleep(0.3)
                 
                 res_s = driver.page_source
                 soup_p = BeautifulSoup(res_s, 'html.parser')
-                WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
-   
+                WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
     
                 #---------------------------------------------------------------------------------------------------------------         
                 # 수집 (홈탭)
@@ -269,21 +277,18 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                         
                         # 리뷰 요소를 찾아 수집
                         review_elements = soup_reviews.find_all('div', class_='pui__vn15t2')
-                        if not review_elements:
-                            raise NoSuchElementException("리뷰가 없음")  # 리뷰가 없으면 예외 발생
-
                         reviews = [review.text.strip() for review in review_elements]
                         reviews_text = ' // '.join(reviews) if reviews else "리뷰 없음"
                         print(f'리뷰: {reviews_text}')
                     else:
-                        reviews_text = "정보 없음"
-                        print(f'방문자 리뷰 2 : {reviews_text}')
-                except NoSuchElementException as e:
-                    # 리뷰가 없는 경우: 리뷰 없음 출력 후 패스
+                        reviews_text = "리뷰 탭 없음"
+                        print(f'리뷰 탭이 없습니다: {reviews_text}')
+                except NoSuchElementException:
+                    # 리뷰가 없는 경우: 리뷰 없음 출력 후 다음으로
                     reviews_text = "리뷰 없음"
                     print(f'리뷰 없음: {reviews_text}')
                 except Exception as e:
-                    # 예외 출력
+                    # 다른 에러의 경우 로깅
                     reviews_text = "정보 없음"
                     print(f'방문자 리뷰 수집 오류: {e}')
                 
@@ -314,7 +319,8 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     try:
                         element = page[case2]
                         driver.execute_script("arguments[0].scrollIntoView(true);", element)
-                        WebDriverWait(driver, 2).until(EC.element_to_be_clickable(element))
+                        WebDriverWait(driver, 5).until(EC.element_to_be_clickable(element))
+                        
 
                         cate_s = cate[case2]
                         cate_f = cate_s.text.strip() # 태그정보 
@@ -330,7 +336,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                         
                         res_s = driver.page_source
                         soup_p = BeautifulSoup(res_s, 'html.parser')
-                        WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
+                        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
 
                     
                         # 정보 없을 시 다음
@@ -444,21 +450,18 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                                 
                                 # 리뷰 요소를 찾아 수집
                                 review_elements = soup_reviews.find_all('div', class_='pui__vn15t2')
-                                if not review_elements:
-                                    raise NoSuchElementException("리뷰가 없음")  # 리뷰가 없으면 예외 발생
-
                                 reviews = [review.text.strip() for review in review_elements]
                                 reviews_text = ' // '.join(reviews) if reviews else "리뷰 없음"
                                 print(f'리뷰: {reviews_text}')
                             else:
-                                reviews_text = "정보 없음"
-                                print(f'방문자 리뷰 2 : {reviews_text}')
-                        except NoSuchElementException as e:
-                            # 리뷰가 없는 경우: 리뷰 없음 출력 후 패스
+                                reviews_text = "리뷰 탭 없음"
+                                print(f'리뷰 탭이 없습니다: {reviews_text}')
+                        except NoSuchElementException:
+                            # 리뷰가 없는 경우: 리뷰 없음 출력 후 다음으로
                             reviews_text = "리뷰 없음"
                             print(f'리뷰 없음: {reviews_text}')
                         except Exception as e:
-                            # 예외 출력
+                            # 다른 에러의 경우 로깅
                             reviews_text = "정보 없음"
                             print(f'방문자 리뷰 수집 오류: {e}')
                         
@@ -477,8 +480,8 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
     
                     total_t.append([cate_f, keyword, title_f, addr_f, num_f, ser_f, com, inf_f1, inf_f2, reviews_text])
                     save_to_excel(total_t)
-                    
-                
+
+            
             # 페이지 이동
             try:
                 next_btn = driver.find_elements(By.CSS_SELECTOR, '.zRM9F > a')
@@ -491,21 +494,22 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     elif next_btn_len == 1: 
                         break
                     elif next_btn_len > 0:  # 버튼이 존재할 경우에만 클릭
-                        next_btn[-1].click()
+                        # JavaScript를 사용하여 클릭
+                        driver.execute_script("arguments[0].scrollIntoView(true);", next_btn[-1])  # 요소 위치로 스크롤 (필요할 경우)
+                        driver.execute_script("arguments[0].click();", next_btn[-1])
                         time.sleep(2)
             except IndexError:
                 print("더 이상 이동할 페이지가 없습니다.")
-          
-                
+
                 
             except (TimeoutException, NoSuchElementException) as e:
                 print(f'Error during pagination: {e}')
                 break
-             
+            
         except (TimeoutException, NoSuchElementException) as e:
             print(f'Error during page processing: {e}')
             break
-  
+
     
 
 # 종료
