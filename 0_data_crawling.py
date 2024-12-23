@@ -19,13 +19,24 @@ start = time.time()
 df_f = pd.read_excel("./keywords.xlsx")
 
 chrome_options = Options()
-chrome_options.add_argument('--headless')  # 헤드리스 모드
+# chrome_options.add_argument('--headless')  # 헤드리스 모드
 chrome_options.add_argument('--disable-gpu')  # GPU 비활성화 (윈도우용)
 chrome_options.add_argument('--no-sandbox')  # 리눅스 환경에서 필요
 chrome_options.add_argument('--disable-dev-shm-usage')  # 메모리 문제 해결
 chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36')
 driver = webdriver.Chrome(options=chrome_options)
 driver.maximize_window() #전체 화면 시행 
+
+def close_popup():
+    try:
+        # 팝업을 닫는 버튼이 있는 경우, 선택자를 통해 접근
+        # popup_close_selector는 실제 팝업의 닫기 버튼 선택자로 변경 필요
+        popup_close_selector = "#popupCloseButton"  # 정확한 선택자를 사용
+        close_button = driver.find_element(By.CSS_SELECTOR, popup_close_selector)
+        close_button.click()
+    except NoSuchElementException:
+        # 팝업이 없으면 무시
+        pass
 
 # 프레임 변경 
 # def switch_frame(frame_name):
@@ -34,7 +45,7 @@ driver.maximize_window() #전체 화면 시행
 def switch_frame(frame_name):
     driver.switch_to.default_content()
     try:
-        # 프레임이 로딩될 때까지 최대 15초 대기
+        # 프레임이 로딩될 때까지 대기
         WebDriverWait(driver, 20).until(EC.frame_to_be_available_and_switch_to_it((By.ID, frame_name)))
     except TimeoutException:
         print(f"[경고] 프레임 {frame_name}이(가) 로드되지 않았습니다. 다시 시도합니다.")
@@ -137,6 +148,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
     next_btn = driver.find_elements(By.CSS_SELECTOR, '.zRM9F > a')  # 다음 페이지 버튼
     next_btn_len = len(driver.find_elements(By.CSS_SELECTOR, '.zRM9F > a[class*=mBN2s]')) # 다음페이지 수
     page = driver.find_elements(By.CSS_SELECTOR, '.YwYLL') # 업체수
+    cate = driver.find_elements(By.CLASS_NAME, 'YzBgS')
     
     t_len = len(page)
     
@@ -156,20 +168,38 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
             # 업체 한곳
             if t_len == 1:
                 
-                # 단일 업체에서는 항상 첫번째 요소를 선택
-                element = page[0]
+                # # 단일 업체에서는 항상 첫번째 요소를 선택
+                # element = page[0]
+                # driver.execute_script("arguments[0].scrollIntoView(true);", element)
+                # WebDriverWait(driver, 5).until(EC.element_to_be_clickable(element))
+                        
+                # cate_s = cate[case1]
+                # cate_f = cate_s.text.strip() # 태그정보 
+                # element_text = element.text.strip()
                 
-                # 업체 클릭
-                element.click()
-                time.sleep(0.3)
+                # close_popup()
+
+                # # 업체 클릭
+                # element.click()
+                # time.sleep(2)
                 
+                # switch_frame('entryIframe')
+                # time.sleep(0.3)
+                
+                # res_s = driver.page_source
+                # soup_p = BeautifulSoup(res_s, 'html.parser')
+                # WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
+
+                # # 정보 없을 시 다음
+                # if not driver.find_element(By.XPATH, '//*[@id="_title"]').is_displayed():
+                #     continue
                 switch_frame('entryIframe')
-                time.sleep(0.3)
+                time.sleep(0.5)
                 
                 res_s = driver.page_source
                 soup_p = BeautifulSoup(res_s, 'html.parser')
-                WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
-    
+                WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
+                
                 #---------------------------------------------------------------------------------------------------------------         
                 # 수집 (홈탭)
                 cate_f = ''
@@ -207,6 +237,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                             com.append(h_time)
                 except NoSuchElementException:
                     com = ['정보 없음']
+                    print("영업시간 정보를 담고 있는 요소를 찾을 수 없습니다.")
                 print(f'영업시간: {com}')
                 
             
