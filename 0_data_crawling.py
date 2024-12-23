@@ -19,7 +19,7 @@ start = time.time()
 df_f = pd.read_excel("./keyword.xlsx")
 
 chrome_options = Options()
-# chrome_options.add_argument('--headless')  # 헤드리스 모드
+chrome_options.add_argument('--headless')  # 헤드리스 모드
 chrome_options.add_argument('--disable-gpu')  # GPU 비활성화 (윈도우용)
 chrome_options.add_argument('--no-sandbox')  # 리눅스 환경에서 필요
 chrome_options.add_argument('--disable-dev-shm-usage')  # 메모리 문제 해결
@@ -28,9 +28,16 @@ driver = webdriver.Chrome(options=chrome_options)
 driver.maximize_window() #전체 화면 시행 
 
 # 프레임 변경 
+# def switch_frame(frame_name):
+#     driver.switch_to.default_content()
+#     WebDriverWait(driver, 2).until(EC.frame_to_be_available_and_switch_to_it((By.ID, frame_name)))
 def switch_frame(frame_name):
     driver.switch_to.default_content()
-    WebDriverWait(driver, 2).until(EC.frame_to_be_available_and_switch_to_it((By.ID, frame_name)))
+    try:
+        # 프레임이 로딩될 때까지 최대 10초 대기
+        WebDriverWait(driver, 10).until(EC.frame_to_be_available_and_switch_to_it((By.ID, frame_name)))
+    except TimeoutException:
+        print(f"프레임 {frame_name}이(가) 로드되지 않았습니다.")
 
 # 스크롤 시행 
 def page_down(num):
@@ -242,41 +249,50 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                 try:
                     xpath3 = "//a[@class='tpj9w _tab-menu' and .//span[text()='리뷰']]"
                     elements = driver.find_elements(By.XPATH, xpath3)
-                    print(" === elements === ", elements)
-                    if elements:
-                        # 스크롤
-                        driver.execute_script("arguments[0].scrollIntoView(true);", elements[0])  
-                        driver.execute_script("arguments[0].click();", elements[0])  
 
+                    if elements:
+                        # 리뷰 탭으로 스크롤 및 클릭
+                        driver.execute_script("arguments[0].scrollIntoView(true);", elements[0])
+                        driver.execute_script("arguments[0].click();", elements[0])
+
+                        # 리뷰 탭 로드 대기
                         WebDriverWait(driver, 5).until(
-                            EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))                  
+                            EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]'))
+                        )
                         
-                        time.sleep(2)  # 추가 대기
-                        page_down(3)
+                        time.sleep(2)  # 추가 대기 시간
+                        load_reviews_with_limit(limit=5)  # 리뷰를 5번 로드하는 함수 호출
                         
+                        # 제한된 리뷰를 로드한 후 리뷰 요소 수집
                         res_reviews = driver.page_source
                         soup_reviews = BeautifulSoup(res_reviews, 'html.parser')
                         
-                        # 리뷰 리스트 찾기
+                        # 리뷰 요소를 찾아 수집
                         review_elements = soup_reviews.find_all('div', class_='pui__vn15t2')
-                        reviews = [review.text.strip() for review in review_elements if review]
+                        if not review_elements:
+                            raise NoSuchElementException("리뷰가 없음")  # 리뷰가 없으면 예외 발생
+
+                        reviews = [review.text.strip() for review in review_elements]
                         reviews_text = ' // '.join(reviews) if reviews else "리뷰 없음"
                         print(f'리뷰: {reviews_text}')
-
+                    else:
+                        reviews_text = "정보 없음"
+                        print(f'방문자 리뷰 2 : {reviews_text}')
+                except NoSuchElementException as e:
+                    # 리뷰가 없는 경우: 리뷰 없음 출력 후 패스
+                    reviews_text = "리뷰 없음"
+                    print(f'리뷰 없음: {reviews_text}')
                 except Exception as e:
-                    inf_f1 = "정보 없음"
-                    inf_f2 = "정보 없음"
-                    print(f'정보: {inf_f1}')
-                    print(f'대표키워드: {inf_f2}')
-                    print(f"정보탭 클릭 오류: {e}")
-                    pass
+                    # 예외 출력
+                    reviews_text = "정보 없음"
+                    print(f'방문자 리뷰 수집 오류: {e}')
                 
                 
                 switch_frame('searchIframe')
                 time.sleep(0.5)
                 
                 
-                total_t.append([ cate_f, keyword, title_f, addr_f, num_f, ser_f, com, inf_f1, inf_f2 ])
+                total_t.append([ cate_f, keyword, title_f, addr_f, num_f, ser_f, com, inf_f1, inf_f2, reviews_text])
                 save_to_excel(total_t)
                 #---------------------------------------------------------------------------------------------------------------    
                 
@@ -414,8 +430,10 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                                 driver.execute_script("arguments[0].scrollIntoView(true);", elements[0])
                                 driver.execute_script("arguments[0].click();", elements[0])
 
+                                # 리뷰 탭 로드 대기
                                 WebDriverWait(driver, 5).until(
-                                    EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
+                                    EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]'))
+                                )
                                 
                                 time.sleep(2)  # 추가 대기 시간
                                 load_reviews_with_limit(limit=5)  # 리뷰를 5번 로드하는 함수 호출
@@ -426,16 +444,23 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                                 
                                 # 리뷰 요소를 찾아 수집
                                 review_elements = soup_reviews.find_all('div', class_='pui__vn15t2')
-                                reviews = [review.text.strip() for review in review_elements if review]
+                                if not review_elements:
+                                    raise NoSuchElementException("리뷰가 없음")  # 리뷰가 없으면 예외 발생
+
+                                reviews = [review.text.strip() for review in review_elements]
                                 reviews_text = ' // '.join(reviews) if reviews else "리뷰 없음"
                                 print(f'리뷰: {reviews_text}')
                             else:
                                 reviews_text = "정보 없음"
                                 print(f'방문자 리뷰 2 : {reviews_text}')
+                        except NoSuchElementException as e:
+                            # 리뷰가 없는 경우: 리뷰 없음 출력 후 패스
+                            reviews_text = "리뷰 없음"
+                            print(f'리뷰 없음: {reviews_text}')
                         except Exception as e:
+                            # 예외 출력
                             reviews_text = "정보 없음"
-                            print(f'방문자 리뷰: {reviews_text}')
-                            print(f"정보탭 클릭 오류: {e}")
+                            print(f'방문자 리뷰 수집 오류: {e}')
                         
                         
                         
