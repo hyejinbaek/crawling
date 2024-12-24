@@ -19,7 +19,7 @@ start = time.time()
 df_f = pd.read_excel("./keywords.xlsx")
 
 chrome_options = Options()
-# chrome_options.add_argument('--headless')  # 헤드리스 모드
+chrome_options.add_argument('--headless')  # 헤드리스 모드
 chrome_options.add_argument('--disable-gpu')  # GPU 비활성화 (윈도우용)
 chrome_options.add_argument('--no-sandbox')  # 리눅스 환경에서 필요
 chrome_options.add_argument('--disable-dev-shm-usage')  # 메모리 문제 해결
@@ -166,39 +166,44 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                 break
             #==================================================================================================================        
             # 업체 한곳
-            if t_len == 1:
-                
-                # # 단일 업체에서는 항상 첫번째 요소를 선택
-                # element = page[0]
-                # driver.execute_script("arguments[0].scrollIntoView(true);", element)
-                # WebDriverWait(driver, 5).until(EC.element_to_be_clickable(element))
-                        
-                # cate_s = cate[case1]
-                # cate_f = cate_s.text.strip() # 태그정보 
-                # element_text = element.text.strip()
-                
-                # close_popup()
+            try:
+                if t_len == 1:
+                    # 1번 코드 실행
+                    element = page[0]
+                    driver.execute_script("arguments[0].scrollIntoView(true);", element)
+                    WebDriverWait(driver, 5).until(EC.element_to_be_clickable(element))
 
-                # # 업체 클릭
-                # element.click()
-                # time.sleep(2)
-                
-                # switch_frame('entryIframe')
-                # time.sleep(0.3)
-                
-                # res_s = driver.page_source
-                # soup_p = BeautifulSoup(res_s, 'html.parser')
-                # WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
+                    close_popup()
 
-                # # 정보 없을 시 다음
-                # if not driver.find_element(By.XPATH, '//*[@id="_title"]').is_displayed():
-                #     continue
-                switch_frame('entryIframe')
-                time.sleep(0.5)
-                
-                res_s = driver.page_source
-                soup_p = BeautifulSoup(res_s, 'html.parser')
-                WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
+                    # 업체 클릭
+                    element.click()
+                    time.sleep(2)
+
+                    switch_frame('entryIframe')
+                    time.sleep(0.3)
+
+                    res_s = driver.page_source
+                    soup_p = BeautifulSoup(res_s, 'html.parser')
+                    WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
+
+                    if not driver.find_element(By.XPATH, '//*[@id="_title"]').is_displayed():
+                        raise Exception("Title not displayed")
+            
+            except (TimeoutException, StaleElementReferenceException, NoSuchElementException, Exception) as e:
+                print(f"1번 코드 실행 중 오류 발생: {e}")
+                # 1번 코드에서 오류 발생 시 2번 코드로 대체 실행
+                try:
+                    if t_len == 1:
+                        # 2번 코드 실행
+                        switch_frame('entryIframe')
+                        time.sleep(0.5)
+
+                        res_s = driver.page_source
+                        soup_p = BeautifulSoup(res_s, 'html.parser')
+                        WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
+
+                except Exception as e2:
+                    print(f"2번 코드 실행 중 오류 발생: {e2}")
                 
                 #---------------------------------------------------------------------------------------------------------------         
                 # 수집 (홈탭)
