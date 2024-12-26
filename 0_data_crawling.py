@@ -8,10 +8,11 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, NoSuchElementException
+from selenium.webdriver.common.action_chains import ActionChains
+
 import warnings
 import os 
 warnings.filterwarnings('ignore')
-
 
 start = time.time() 
 
@@ -19,13 +20,15 @@ start = time.time()
 df_f = pd.read_excel("./keywords.xlsx")
 
 chrome_options = Options()
-chrome_options.add_argument('--headless')  # 헤드리스 모드
+# chrome_options.add_argument('--headless')  # 헤드리스 모드
 chrome_options.add_argument('--disable-gpu')  # GPU 비활성화 (윈도우용)
 chrome_options.add_argument('--no-sandbox')  # 리눅스 환경에서 필요
 chrome_options.add_argument('--disable-dev-shm-usage')  # 메모리 문제 해결
 chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36')
 driver = webdriver.Chrome(options=chrome_options)
 driver.maximize_window() #전체 화면 시행 
+
+
 
 def close_popup():
     try:
@@ -38,18 +41,26 @@ def close_popup():
         # 팝업이 없으면 무시
         pass
 
-# 프레임 변경 
-# def switch_frame(frame_name):
-#     driver.switch_to.default_content()
-#     WebDriverWait(driver, 2).until(EC.frame_to_be_available_and_switch_to_it((By.ID, frame_name)))
-def switch_frame(frame_name):
+def click_element_via_js(driver, element):
+    driver.execute_script("arguments[0].scrollIntoView(true);", element)
+    driver.execute_script("arguments[0].click();", element)
+
+def switch_frame(frame_name, max_retries=3):
     driver.switch_to.default_content()
-    try:
-        # 프레임이 로딩될 때까지 대기
-        WebDriverWait(driver, 20).until(EC.frame_to_be_available_and_switch_to_it((By.ID, frame_name)))
-    except TimeoutException:
-        print(f"[경고] 프레임 {frame_name}이(가) 로드되지 않았습니다. 다시 시도합니다.")
-        # 재시도 로직을 추가할 수 있습니다 (예: page refresh)
+    retries = 0
+    while retries < max_retries:
+        try:
+            WebDriverWait(driver, 20).until(EC.frame_to_be_available_and_switch_to_it((By.ID, frame_name)))
+            print(f"[정보] 프레임 {frame_name}으로 전환 성공")
+            return
+        except TimeoutException:
+            retries += 1
+            print(f"[경고] 프레임 {frame_name}이(가) 로드되지 않아 {retries}번째 시도 중입니다.")
+            driver.refresh()
+            time.sleep(2)
+    print(f"[오류] 프레임 {frame_name}로 전환할 수 없습니다. 최대 재시도 횟수를 초과했습니다.")
+
+    print(f"[오류] 프레임 {frame_name}로 전환할 수 없습니다. 최대 재시도 횟수를 초과했습니다.")
 
 # 스크롤 시행 
 def page_down(num):
@@ -86,9 +97,7 @@ def load_reviews_with_limit(limit=5):
             xpath4 = "//span[@class='TeItc' and contains(text(),'더보기')]"
             load_more_button = driver.find_element(By.XPATH, xpath4)
             
-            # "더보기" 버튼으로 스크롤 및 클릭
-            driver.execute_script("arguments[0].scrollIntoView(true);", load_more_button)
-            load_more_button.click()
+            click_element_via_js(driver, load_more_button)
             
             # 새로운 리뷰가 로드될 시간을 기다림
             time.sleep(2)
@@ -99,7 +108,6 @@ def load_reviews_with_limit(limit=5):
             break
 
 def save_to_excel(data, filename='crawling_주유소세차장.xlsx'):
-    # 열 이름 정의 (data의 요소 개수와 일치해야 함)
     columns = ['Category', 'Keyword', 'Title', 'Address', 'number', 'service', 'wk', 'info1', 'info2', 'reviews_text']
     
     # 데이터 개수를 확인하여 누락된 값을 기본값으로 채우기
@@ -121,7 +129,14 @@ def save_to_excel(data, filename='crawling_주유소세차장.xlsx'):
     # 파일 저장
     df.to_excel(filename, index=False, engine='openpyxl')
 
-    
+def get_fresh_element(driver, by, path):
+    try:
+        element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((by, path)))
+        return element
+    except TimeoutException:
+        print("Element not found.")
+        return None
+
 count = 1
 total_t = []
 
@@ -134,7 +149,6 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
         url = f'https://map.naver.com/v5/search/{keyword}'
     driver.get(url)
     driver.refresh() 
-
 
     # 메인 프레임
     switch_frame('searchIframe')
@@ -171,8 +185,8 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     # 1번 코드 실행
                     element = page[0]
                     driver.execute_script("arguments[0].scrollIntoView(true);", element)
-                    WebDriverWait(driver, 5).until(EC.element_to_be_clickable(element))
-
+                    click_element_via_js(driver, element)
+                    
                     close_popup()
 
                     # 업체 클릭
@@ -229,11 +243,17 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                 print(f'편의: {ser_f}')
                 
 
+                # 영업시간 정보 수집 부분 내의 클
                 com = []
                 try:
                     work_day_element = driver.find_element(By.CSS_SELECTOR, 'div.y6tNq')
                     if work_day_element.is_displayed():
-                        work_day_element.click()
+                        # 요소를 화면에 보이도록 스크롤
+                        driver.execute_script("arguments[0].scrollIntoView(true);", work_day_element)
+
+                        click_element_via_js(driver, work_day_element)
+
+                        # 영업시간 정보 추출
                         work_h = driver.find_elements(By.CSS_SELECTOR, 'div.y6tNq span.A_cdD')
                         for w_hh in work_h:
                             day = w_hh.find_element(By.CSS_SELECTOR, 'span.i8cJw').text
@@ -243,7 +263,15 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                 except NoSuchElementException:
                     com = ['정보 없음']
                     print("영업시간 정보를 담고 있는 요소를 찾을 수 없습니다.")
+                except Exception as e:
+                    com = ['정보 없음']
+                    print(f"영업시간 정보 수집 중 에러 발생: {e}")
+                    
                 print(f'영업시간: {com}')
+                
+                # 마우스 액션 체인을 사용하여 클릭
+                action = ActionChains(driver)
+                action.move_to_element(work_day_element).click().perform()
                 
             
                 # 수집 (정보탭)                   
@@ -254,7 +282,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     if elements:
                         # 스크롤 
                         driver.execute_script("arguments[0].scrollIntoView(true);", elements[0]) 
-                        driver.execute_script("arguments[0].click();", elements[0]) 
+                        click_element_via_js(driver, elements[0])
                         
                         WebDriverWait(driver, 5).until(
                             EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
@@ -297,20 +325,20 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     if elements:
                         # 리뷰 탭으로 스크롤 및 클릭
                         driver.execute_script("arguments[0].scrollIntoView(true);", elements[0])
-                        driver.execute_script("arguments[0].click();", elements[0])
+                        click_element_via_js(driver, elements[0])
 
                         # 리뷰 탭 로드 대기
                         WebDriverWait(driver, 5).until(
                             EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]'))
                         )
-                        
+                                
                         time.sleep(2)  # 추가 대기 시간
                         load_reviews_with_limit(limit=5)  # 리뷰를 5번 로드하는 함수 호출
-                        
+                                
                         # 제한된 리뷰를 로드한 후 리뷰 요소 수집
                         res_reviews = driver.page_source
                         soup_reviews = BeautifulSoup(res_reviews, 'html.parser')
-                        
+                                
                         # 리뷰 요소를 찾아 수집
                         review_elements = soup_reviews.find_all('div', class_='pui__vn15t2')
                         reviews = [review.text.strip() for review in review_elements]
@@ -333,7 +361,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                 time.sleep(0.5)
                 
                 
-                total_t.append([ cate_f, keyword, title_f, addr_f, num_f, ser_f, com, inf_f1, inf_f2, reviews_text])
+                total_t.append([cate_f, keyword, title_f, addr_f, num_f, ser_f, com, inf_f1, inf_f2, reviews_text])
                 save_to_excel(total_t)
                 #---------------------------------------------------------------------------------------------------------------    
                 
@@ -355,7 +383,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     try:
                         element = page[case2]
                         driver.execute_script("arguments[0].scrollIntoView(true);", element)
-                        WebDriverWait(driver, 5).until(EC.element_to_be_clickable(element))
+                        click_element_via_js(driver, element)
                         
 
                         cate_s = cate[case2]
@@ -363,7 +391,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                         element_text = element.text.strip()
 
                         # 업체 클릭
-                        element.click()
+                        # element.click()
                         time.sleep(2)
                 
                         # 클릭시 프레임 변경
@@ -404,11 +432,17 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                         print(f'편의: {ser_f}')
         
         
+                        # 영업시간 정보 수집 부분 내의 클
                         com = []
                         try:
                             work_day_element = driver.find_element(By.CSS_SELECTOR, 'div.y6tNq')
                             if work_day_element.is_displayed():
-                                work_day_element.click()
+                                # 요소를 화면에 보이도록 스크롤
+                                driver.execute_script("arguments[0].scrollIntoView(true);", work_day_element)
+
+                                click_element_via_js(driver, work_day_element)
+
+                                # 영업시간 정보 추출
                                 work_h = driver.find_elements(By.CSS_SELECTOR, 'div.y6tNq span.A_cdD')
                                 for w_hh in work_h:
                                     day = w_hh.find_element(By.CSS_SELECTOR, 'span.i8cJw').text
@@ -417,7 +451,16 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                                     com.append(h_time)
                         except NoSuchElementException:
                             com = ['정보 없음']
+                            print("영업시간 정보를 담고 있는 요소를 찾을 수 없습니다.")
+                        except Exception as e:
+                            com = ['정보 없음']
+                            print(f"영업시간 정보 수집 중 에러 발생: {e}")
+                            
                         print(f'영업시간: {com}')
+                        
+                        # 마우스 액션 체인을 사용하여 클릭
+                        action = ActionChains(driver)
+                        action.move_to_element(work_day_element).click().perform()
 
                         
                         # 수집 (정보탭)             
@@ -427,7 +470,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                             if elements:
                                 # 스크롤
                                 driver.execute_script("arguments[0].scrollIntoView(true);", elements[0])  
-                                driver.execute_script("arguments[0].click();", elements[0])  
+                                click_element_via_js(driver, elements[0])
 
                                 WebDriverWait(driver, 5).until(
                                     EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))                  
@@ -470,7 +513,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                             if elements:
                                 # 리뷰 탭으로 스크롤 및 클릭
                                 driver.execute_script("arguments[0].scrollIntoView(true);", elements[0])
-                                driver.execute_script("arguments[0].click();", elements[0])
+                                click_element_via_js(driver, elements[0])
 
                                 # 리뷰 탭 로드 대기
                                 WebDriverWait(driver, 5).until(
@@ -507,8 +550,6 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                         switch_frame('searchIframe')
                         time.sleep(0.5)
                     
-                    
-                    
                     except (TimeoutException, StaleElementReferenceException, AttributeError, IndexError, NoSuchElementException) as e:
                         print(f"error name: {e}") 
                         break
@@ -532,7 +573,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     elif next_btn_len > 0:  # 버튼이 존재할 경우에만 클릭
                         # JavaScript를 사용하여 클릭
                         driver.execute_script("arguments[0].scrollIntoView(true);", next_btn[-1])  # 요소 위치로 스크롤 (필요할 경우)
-                        driver.execute_script("arguments[0].click();", next_btn[-1])
+                        click_element_via_js(driver, next_btn[-1])
                         time.sleep(2)
             except IndexError:
                 print("더 이상 이동할 페이지가 없습니다.")
