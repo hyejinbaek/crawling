@@ -17,7 +17,11 @@ warnings.filterwarnings('ignore')
 start = time.time() 
 
 # 키워드 파일 읽어옴
-df_f = pd.read_excel("./keywords.xlsx")
+# df_f = pd.read_excel("./keywords.xlsx")
+df_f = pd.read_excel("./keywords_1.xlsx")
+# df_f = pd.read_excel("./keywords_2.xlsx")
+# df_f = pd.read_excel("./keywords_3.xlsx")
+
 
 chrome_options = Options()
 # chrome_options.add_argument('--headless')  # 헤드리스 모드
@@ -185,8 +189,8 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     # 1번 코드 실행
                     element = page[0]
                     driver.execute_script("arguments[0].scrollIntoView(true);", element)
-                    click_element_via_js(driver, element)
-                    
+                    WebDriverWait(driver, 5).until(EC.element_to_be_clickable(element))
+
                     close_popup()
 
                     # 업체 클릭
@@ -243,17 +247,11 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                 print(f'편의: {ser_f}')
                 
 
-                # 영업시간 정보 수집 부분 내의 클
                 com = []
                 try:
                     work_day_element = driver.find_element(By.CSS_SELECTOR, 'div.y6tNq')
                     if work_day_element.is_displayed():
-                        # 요소를 화면에 보이도록 스크롤
-                        driver.execute_script("arguments[0].scrollIntoView(true);", work_day_element)
-
-                        click_element_via_js(driver, work_day_element)
-
-                        # 영업시간 정보 추출
+                        work_day_element.click()
                         work_h = driver.find_elements(By.CSS_SELECTOR, 'div.y6tNq span.A_cdD')
                         for w_hh in work_h:
                             day = w_hh.find_element(By.CSS_SELECTOR, 'span.i8cJw').text
@@ -263,15 +261,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                 except NoSuchElementException:
                     com = ['정보 없음']
                     print("영업시간 정보를 담고 있는 요소를 찾을 수 없습니다.")
-                except Exception as e:
-                    com = ['정보 없음']
-                    print(f"영업시간 정보 수집 중 에러 발생: {e}")
-                    
                 print(f'영업시간: {com}')
-                
-                # 마우스 액션 체인을 사용하여 클릭
-                action = ActionChains(driver)
-                action.move_to_element(work_day_element).click().perform()
                 
             
                 # 수집 (정보탭)                   
@@ -282,7 +272,7 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     if elements:
                         # 스크롤 
                         driver.execute_script("arguments[0].scrollIntoView(true);", elements[0]) 
-                        click_element_via_js(driver, elements[0])
+                        driver.execute_script("arguments[0].click();", elements[0]) 
                         
                         WebDriverWait(driver, 5).until(
                             EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]')))
@@ -325,20 +315,20 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     if elements:
                         # 리뷰 탭으로 스크롤 및 클릭
                         driver.execute_script("arguments[0].scrollIntoView(true);", elements[0])
-                        click_element_via_js(driver, elements[0])
+                        driver.execute_script("arguments[0].click();", elements[0])
 
                         # 리뷰 탭 로드 대기
                         WebDriverWait(driver, 5).until(
                             EC.presence_of_element_located((By.XPATH, '//*[@id="_title"]'))
                         )
-                                
+                        
                         time.sleep(2)  # 추가 대기 시간
                         load_reviews_with_limit(limit=5)  # 리뷰를 5번 로드하는 함수 호출
-                                
+                        
                         # 제한된 리뷰를 로드한 후 리뷰 요소 수집
                         res_reviews = driver.page_source
                         soup_reviews = BeautifulSoup(res_reviews, 'html.parser')
-                                
+                        
                         # 리뷰 요소를 찾아 수집
                         review_elements = soup_reviews.find_all('div', class_='pui__vn15t2')
                         reviews = [review.text.strip() for review in review_elements]
@@ -357,11 +347,12 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                     print(f'방문자 리뷰 수집 오류: {e}')
                 
                 
+
+                
                 switch_frame('searchIframe')
                 time.sleep(0.5)
-                
-                
-                total_t.append([cate_f, keyword, title_f, addr_f, num_f, ser_f, com, inf_f1, inf_f2, reviews_text])
+                    
+                total_t.append([ cate_f, keyword, title_f, addr_f, num_f, ser_f, com, inf_f1, inf_f2, reviews_text])
                 save_to_excel(total_t)
                 #---------------------------------------------------------------------------------------------------------------    
                 
