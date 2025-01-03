@@ -18,9 +18,9 @@ start = time.time()
 
 # 키워드 파일 읽어옴
 # df_f = pd.read_excel("./keywords.xlsx")
-df_f = pd.read_excel("./keywords_1.xlsx")
+# df_f = pd.read_excel("./keywords_1.xlsx")
 # df_f = pd.read_excel("./keywords_2.xlsx")
-# df_f = pd.read_excel("./keywords_3.xlsx")
+df_f = pd.read_excel("./keywords_3.xlsx")
 
 
 chrome_options = Options()
@@ -450,8 +450,9 @@ for idx, v in enumerate(df_f['검색리스트'], start=1):
                         print(f'영업시간: {com}')
                         
                         # 마우스 액션 체인을 사용하여 클릭
-                        action = ActionChains(driver)
-                        action.move_to_element(work_day_element).click().perform()
+                        actions = ActionChains(driver)
+                        actions.move_to_element(element).perform()
+                        element.click()
 
                         
                         # 수집 (정보탭)             
