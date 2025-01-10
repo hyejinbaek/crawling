@@ -1,9 +1,10 @@
+# 전처리/후처리 한 결과 취합 및 정리
 import pandas as pd
 import re
 import numpy as np
 
 # 엑셀 파일 읽기
-df1 = pd.read_excel("./keyword_final/combined_keyword_results.xlsx")
+df1 = pd.read_excel("./keyword_final/result.xlsx")
 df2 = pd.read_excel("final.xlsx")
 
 
@@ -15,12 +16,13 @@ def determine_category(row):
     file_part = row['source_file'].split('_')[1].split('.')[0]  # 'crawling_광택.xlsx'에서 '광택' 추출
     if file_part in ['광택', '디테일링', '손세차', '세차']:
         return '손세차장'
-    elif file_part in ['주유소', '컴인워시', '노터치', '노브러시']:
+    elif file_part in ['주유소세차장', '노터치']:
         return '자동세차장'
     else:
         return None
 
 new_data['구분'] = df1.apply(determine_category, axis=1)
+
 
 # 나머지 컬럼 복사
 new_data['키워드'] = df1['Keyword']
@@ -29,7 +31,7 @@ new_data['주소'] = df1['Address']
 new_data['전화번호'] = df1['number']
 new_data['편의시설'] = df1['service']
 new_data['영업일'] = df1['wk']
-new_data['방문자리뷰(집계)'] = df1['keywords']
+new_data['방문자리뷰(집계)'] = df1['filtered_keywords']
 new_data['대표키워드'] = df1['info2']
 new_data['홈'] = df1['info1']
 
