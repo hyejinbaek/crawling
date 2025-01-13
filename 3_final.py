@@ -36,10 +36,10 @@ new_data['대표키워드'] = df1['info2']
 new_data['홈'] = df1['info1']
 
 # 'reviews_text'에 따라 '베이', '드라잉존', '디테일링', 'PPF'에 O, X 추가
-new_data['베이'] = df1['reviews_text'].apply(lambda x: 'O' if '베이' in str(x) else 'X')
-new_data['드라잉존'] = df1['reviews_text'].apply(lambda x: 'O' if '드라잉존' in str(x) else 'X')
-new_data['디테일링'] = df1['reviews_text'].apply(lambda x: 'O' if '디테일링' in str(x) else 'X')
-new_data['PPF'] = df1['reviews_text'].apply(lambda x: 'O' if 'PPF' in str(x) else 'X')
+new_data['베이'] = df1['info1'].apply(lambda x: 'O' if '베이' in str(x) else 'X')
+new_data['드라잉존'] = df1['info1'].apply(lambda x: 'O' if '드라잉존' in str(x) else 'X')
+new_data['디테일링'] = df1['info1'].apply(lambda x: 'O' if '디테일링' in str(x) else 'X')
+new_data['PPF'] = df1['info1'].apply(lambda x: 'O' if 'PPF' in str(x) else 'X')
 
 # info1 컬럼에서 URL을 찾고 '홈페이지' 컬럼에 추가
 def extract_website(info):
